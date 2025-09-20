@@ -29,35 +29,28 @@
 
 # Start from Jenkins LTS
 # Start from Jenkins LTS
-FROM jenkins/jenkins:lts
+# Use official Jenkins LTS image
+FROM jenkins/jenkins:lts-jdk17
 
+# Ensure all packages are updated to the latest security patches
+USER root
+RUN apt-get update -y && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
+# Switch to root to install Docker CLI
 USER root
 
-# Install dependencies (Python, pip, Docker CLI requirements, curl, gnupg, etc.)
-RUN apt-get update && apt-get install -y \
-    python3 python3-pip \
-    apt-transport-https ca-certificates curl gnupg lsb-release \
-    && rm -rf /var/lib/apt/lists/*
+# Install Docker CLI dependencies
+RUN apt-get update -y && \
+    apt-get install -y apt-transport-https ca-certificates curl gnupg2 lsb-release software-properties-common && \
+    curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - && \
+    echo "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable" \
+        > /etc/apt/sources.list.d/docker.list && \
+    apt-get update -y && \
+    apt-get install -y docker-ce-cli && \
+    rm -rf /var/lib/apt/lists/*
 
-# Make python3 available as "python"
-RUN ln -s /usr/bin/python3 /usr/bin/python
-
-# Upgrade pip
-RUN pip3 install --upgrade pip
-
-# Install Docker CLI
-RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" \
-       > /etc/apt/sources.list.d/docker.list \
-    && apt-get update && apt-get install -y docker-ce-cli \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Trivy
-RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh \
-    && mv trivy /usr/local/bin/
-
-# Allow Jenkins user to run Docker
+# Add Jenkins user to docker group (so it can use host Docker)
 RUN usermod -aG docker jenkins
 
+# Switch back to Jenkins user
 USER jenkins
-
