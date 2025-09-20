@@ -28,20 +28,36 @@
 # CMD ["python", "app.py"]
 
 # Start from Jenkins LTS
+# Start from Jenkins LTS
 FROM jenkins/jenkins:lts
 
 USER root
 
-# Install Python and pip
+# Install dependencies (Python, pip, Docker CLI requirements, curl, gnupg, etc.)
 RUN apt-get update && apt-get install -y \
     python3 python3-pip \
+    apt-transport-https ca-certificates curl gnupg lsb-release \
     && rm -rf /var/lib/apt/lists/*
 
 # Make python3 available as "python"
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
-# (Optional) upgrade pip
+# Upgrade pip
 RUN pip3 install --upgrade pip
 
-# Switch back to jenkins user
+# Install Docker CLI
+RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" \
+       > /etc/apt/sources.list.d/docker.list \
+    && apt-get update && apt-get install -y docker-ce-cli \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Trivy
+RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh \
+    && mv trivy /usr/local/bin/
+
+# Allow Jenkins user to run Docker
+RUN usermod -aG docker jenkins
+
 USER jenkins
+
